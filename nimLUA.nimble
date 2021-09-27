@@ -16,7 +16,7 @@ proc test(env, path: string) =
     debugEcho "LANG: ", lang
 
   when defined(unix):
-    const libm = "-lm"
+    const libm = "-t:-lm"
   else:
     const libm = ""
 
@@ -30,7 +30,7 @@ proc test(env, path: string) =
     mkDir "build"
   exec "nim " & lang & " " & env &
     " --outdir:build -r --hints:off --warnings:off " &
-    " -d:lua_static_lib --passL:\"-Lexternal -llua " & libm & " \" " & path
+    " -d:lua_static_lib " & libm & " " & path
 
 task test, "Run all tests":
   test "-d:nimDebugDlOpen", "tests/test_features"
