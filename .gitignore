@@ -3,6 +3,4 @@ nimPDF/
 bug/
 *.exe
 *.dll
-lua/
 master/
-external/

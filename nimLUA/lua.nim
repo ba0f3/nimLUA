@@ -6,9 +6,9 @@
 #
 const
   LUA_VERSION_MAJOR* = "5"
-  LUA_VERSION_MINOR* = "3"
-  LUA_VERSION_NUM* = 531
-  LUA_VERSION_RELEASE* = "1"
+  LUA_VERSION_MINOR* = "4"
+  LUA_VERSION_NUM* = 543
+  LUA_VERSION_RELEASE* = "3"
   LUA_VERSION* = "Lua " & LUA_VERSION_MAJOR & "." & LUA_VERSION_MINOR
   #LUA_RELEASE = LUA_VERSION & "." & LUA_VERSION_RELEASE
   #LUA_COPYRIGHT = LUA_RELEASE & " Copyright (C) 1994-2012 Lua.org, PUC-Rio"
@@ -24,23 +24,23 @@ when SHARED_LIB_NAME != "none":
 elif not defined(useLuaJIT):
   when defined(MACOSX):
     const
-      LIB_NAME* = "liblua53.dylib"
+      LIB_NAME* = "liblua54.dylib"
   elif defined(FREEBSD):
     const
-      LIB_NAME* = "liblua-5.3.so"
+      LIB_NAME* = "liblua-5.4.so"
   elif defined(UNIX):
     const
-      LIB_NAME* = "liblua53.so"
+      LIB_NAME* = "liblua54.so"
   else:
     const
-      LIB_NAME* = "lua53.dll"
+      LIB_NAME* = "lua54.dll"
 else:
   when defined(MACOSX):
     const
       LIB_NAME* = "libluajit.dylib"
   elif defined(FREEBSD):
     const
-      LIB_NAME* = "libluajit-5.1.so"
+      LIB_NAME* = "libluajit-5.4.so"
   elif defined(UNIX):
     const
       LIB_NAME* = "libluajit.so"
@@ -137,6 +137,12 @@ type
   lua_Integer* = int64    # ptrdiff_t \ type for integer functions
 
 when defined(lua_static_lib):
+  import os
+  {.passC: "-DMAKE_LIB".}
+  const LUA_DIR = currentSourcePath().splitPath.head & "/../external/lua/src"
+  {.compile: LUA_DIR / "onelua.c".}
+
+
   {.pragma: ilua, cdecl, importc: "lua_$1".} # lua.h
   {.pragma: iluaLIB, cdecl, importc: "lua$1".} # lualib.h
   {.pragma: iluaL, cdecl, importc: "luaL_$1".} # lauxlib.h
@@ -238,7 +244,8 @@ proc rawget*(L: PState; idx: cint) {.ilua.}
 proc rawgeti*(L: PState; idx: cint; n: cint) {.ilua.}
 proc rawgetp*(L: PState; idx: cint; p: pointer) {.ilua.}
 proc createtable*(L: PState; narr: cint; nrec: cint) {.ilua.}
-proc newuserdata*(L: PState; sz: csize_t): pointer {.ilua.}
+proc newuserdatauv*(L: PState; sz: csize_t, nuvalue: cint): pointer {.ilua.}
+proc newuserdata*(L: PState; sz: csize_t): pointer {.inline.} = newuserdatauv(L, sz, 1)
 proc getmetatable*(L: PState; idx: cint): cint {.ilua.}
 proc getuservalue*(L: PState; idx: cint) {.ilua.}
 
