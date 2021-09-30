@@ -80,7 +80,7 @@ type
   GENE = enum
     ADENINE, CYTOSINE, GUANINE, THYMINE
 
-proc test(L: PState, fileName: string) =
+proc test(L: LuaState, fileName: string) =
   if L.doFile("test" & DirSep & fileName) != 0.cint:
     echo L.toString(-1)
     L.pop(1)
@@ -458,8 +458,8 @@ safe. those functions are:
 
   NLErrorFunc* = proc(ctx: pointer, err: NLError) {.nimcall.}
 
-proc NLSetErrorHandler*(L: PState, errFunc: NLErrorFunc)
-proc NLSetErrorContext*(L: PState, errCtx: pointer)
+proc NLSetErrorHandler*(L: LuaState, errFunc: NLErrorFunc)
+proc NLSetErrorContext*(L: LuaState, errCtx: pointer)
 ```
 
 This is actually not a real error handler, because you cannot use raise exception.

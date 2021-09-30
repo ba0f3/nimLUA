@@ -60,14 +60,14 @@ proc rootv(u: float): seq[float] =
   result = newSeq[float](10)
   for i in 0..9: result[i] = u * i.float
 
-proc testIMPL(L: PState, fileName: string): bool =
+proc testIMPL(L: LuaState, fileName: string): bool =
   if L.doFile("tests" / "luas" / fileName) != 0.cint:
     echo L.toString(-1)
     L.pop(1)
     return
   result = true
 
-template test(L: PState, fileName: string) =
+template test(L: LuaState, fileName: string) =
   test fileName:
     check testIMPL(L, fileName) == true
 
@@ -333,7 +333,7 @@ proc getAvocado(self: PineApple, idx: int): Avocado =
   result = nil
   if idx == 0: result = newAvocado("nanas", 123)
 
-proc testFromLua(L: PState) =
+proc testFromLua(L: LuaState) =
   type
     Layout = ref object
       name: string
@@ -353,7 +353,7 @@ proc testFromLua(L: PState) =
   L.setTable(LUA_REGISTRYINDEX)           # registry[lay.addr] = lay
 
   # register the only entry point of layout hierarchy to lua
-  proc layoutProxy(L: PState): cint {.cdecl.} =
+  proc layoutProxy(L: LuaState): cint {.cdecl.} =
     getRegisteredType(Layout, mtName, pxName)
     var ret = cast[ptr pxName](L.newUserData(sizeof(pxName)))
 

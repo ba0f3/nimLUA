@@ -106,17 +106,17 @@ const
   IDErrorFunc = IDRegion - 2
   NLMaxID* = 0xFFF
 
-template luaError*(x: PState, m: string): untyped =
+template luaError*(x: LuaState, m: string): untyped =
   lua.error(x, m)
 
-template newuserdata*(L: PState, sz: int): pointer =
+template newuserdata*(L: LuaState, sz: int): pointer =
   newuserdata(L, sz.csize_t)
 
-template pushlstring*(L: PState, s: cstring, len: int): cstring =
+template pushlstring*(L: LuaState, s: cstring, len: int): cstring =
   pushlstring(L, s, len.csize_t)
 
-proc isStrictString*(L: PState, idx: int): bool {.inline.} =
-  luaType(L, idx.cint) == LUA_TSTRING.cint
+proc isStrictString*(L: LuaState, idx: int): bool {.inline.} =
+  luaType(L, idx.cint) == LUA_TSTRING
 
 #counter that will be used to generate unique intermediate macro name
 #and avoid name collision
@@ -154,7 +154,7 @@ proc toString(c: LUA_TYPE): string =
   else:
     return "INVALID"
 
-proc nimDebug(L: PState, idx: cint, eType: string) =
+proc nimDebug(L: LuaState, idx: cint, eType: string) =
   var dbg: TDebug
   if L.getStack(1, dbg.addr) != 0:
     if L.getInfo("Sln", dbg.addr) != 0:
@@ -762,7 +762,7 @@ proc getClosureEnv(SL, procName: string, ovIdx: int): string {.compileTime.} =
   glue.add "  $1.pop(3)\n" % [SL]
   result = glue
 
-proc nimLuaPanic(L: PState): cint {.cdecl.} =
+proc nimLuaPanic(L: LuaState): cint {.cdecl.} =
   echo "panic"
   echo L.toString(-1)
   L.pop(1)
@@ -771,18 +771,18 @@ proc nimLuaPanic(L: PState): cint {.cdecl.} =
 proc stdNimLuaErrFunc(ctx: pointer, err: NLError) =
   echo "$1:$2 warning: $3" % [err.source, $err.currentLine, err.msg]
 
-proc NLSetErrorHandler*(L: PState, errFunc: NLErrorFunc) =
+proc NLSetErrorHandler*(L: LuaState, errFunc: NLErrorFunc) =
   L.pushLightUserData(cast[pointer](IDErrorFunc))
   L.pushLightUserData(cast[pointer](errFunc))
   L.rawSet(LUA_REGISTRYINDEX)
 
-proc NLSetErrorContext*(L: PState, errCtx: pointer) =
+proc NLSetErrorContext*(L: LuaState, errCtx: pointer) =
   L.pushLightUserData(cast[pointer](IDErrorContext))
   L.pushLightUserData(errCtx)
   L.rawSet(LUA_REGISTRYINDEX)
 
 #call this before you use this library
-proc newNimLua*(readOnlyEnum = false): PState =
+proc newNimLua*(readOnlyEnum = false): LuaState =
   var L = newState()
   L.openLibs
   discard L.atPanic(nimLuaPanic)
@@ -835,7 +835,7 @@ end
   discard L.doString(nimVer)
   result = L
 
-proc propsEnd*(L: PState) =
+proc propsEnd*(L: LuaState) =
   L.getGlobal("__nlbIndex")
   L.setField(-2, "__index")
   L.getGlobal("__nlbNewIndex")
@@ -937,41 +937,41 @@ macro bindEnum*(arg: varargs[untyped]): untyped =
 
 # these are runtime type check helper for each type
 # supported by Nim and Lua
-proc nimCheckString*(L: PState, idx: cint): string =
+proc nimCheckString*(L: LuaState, idx: cint): string =
   if L.isStrictString(idx): result = L.toString(idx)
   else:
     L.nimDebug(idx.cint, "string")
     result = ""
 
-proc nimCheckBool*(L: PState, idx: cint): bool =
+proc nimCheckBool*(L: LuaState, idx: cint): bool =
   if L.isBoolean(idx): result = if L.toBoolean(idx) == 0: false else: true
   else:
     L.nimDebug(idx.cint, "bool")
     result = false
 
-proc nimCheckInteger*(L: PState, idx: cint): int =
+proc nimCheckInteger*(L: LuaState, idx: cint): int =
   if L.isInteger(idx) != 0: result = L.toInteger(idx).int
   else:
     L.nimDebug(idx.cint, "int")
     result = 0
 
-proc nimCheckNumber*(L: PState, idx: cint): float64 =
+proc nimCheckNumber*(L: LuaState, idx: cint): float64 =
   if L.isNumber(idx) != 0: result = L.toNumber(idx).float64
   else:
     L.nimDebug(idx.cint, "float")
     result = 0.0
 
-proc nimCheckCstring*(L: PState, idx: cint): cstring =
+proc nimCheckCstring*(L: LuaState, idx: cint): cstring =
   if L.isStrictString(idx): result = L.toLString(idx, nil)
   else:
     L.nimDebug(idx.cint, "cstring")
     result = nil
 
-proc nimCheckChar*(L: PState, idx: cint): char =
+proc nimCheckChar*(L: LuaState, idx: cint): char =
   if L.isInteger(idx) != 0: result = L.toInteger(idx).char
   else: result = chr(0)
 
-proc nimNewMetaTable*(L: PState, key: int) =
+proc nimNewMetaTable*(L: LuaState, key: int) =
   L.pushLightUserData(cast[pointer](key))
   L.rawGet(LUA_REGISTRYINDEX)
   if not L.isNil(-1): # name already in use?
@@ -983,11 +983,11 @@ proc nimNewMetaTable*(L: PState, key: int) =
   L.newTable() # create metatable
   L.rawSet(LUA_REGISTRYINDEX)
 
-proc nimGetMetaTable*(L: PState, key: int) =
+proc nimGetMetaTable*(L: LuaState, key: int) =
   L.pushLightUserData(cast[pointer](key))
   L.rawGet(LUA_REGISTRYINDEX)
 
-proc nimCheckUData*(L: PState, idx, key: int, name: string): pointer =
+proc nimCheckUData*(L: LuaState, idx, key: int, name: string): pointer =
   let p = L.toUserData(idx.cint)
   if p != nil: #value is a userdata?
     if L.getMetaTable(idx.cint) != 0.cint: #does it have a metatable?
@@ -1079,7 +1079,7 @@ proc argAttr(mType: NimNode): string {.compileTime.} =
 
   result = ""
 
-proc stackDump*(L: PState) =
+proc stackDump*(L: LuaState) =
   let top = L.getTop()
   echo "total in stack ", top
   for i in 1..top:
@@ -1100,7 +1100,7 @@ proc registerArrayCheck(ctx: proxyDesc, s: NimNode, lo, hi: int, procName: strin
   var needCheck = ""
   if not hasName(name):
     setName(name)
-    var glue = "proc $1(L: PState, idx: int): array[$2..$3, $4] =\n" % [name, $lo, $hi, $s]
+    var glue = "proc $1(L: LuaState, idx: int): array[$2..$3, $4] =\n" % [name, $lo, $hi, $s]
     glue.add "  L.checkType(idx.cint, LUA_TTABLE)\n"
     glue.add "  let len = min(L.llen(idx.cint), result.len)\n"
     glue.add "  L.pushNil()\n"
@@ -1123,7 +1123,7 @@ proc registerArrayCheck(ctx: proxyDesc, s: NimNode, hi: int, procName: string): 
   var needCheck = ""
   if not hasName(name):
     setName(name)
-    var glue = "proc $1(L: PState, idx: int): array[$2, $3] =\n" % [name, $hi, $s]
+    var glue = "proc $1(L: LuaState, idx: int): array[$2, $3] =\n" % [name, $hi, $s]
     glue.add "  L.checkType(idx.cint, LUA_TTABLE)\n"
     glue.add "  let len = min(L.llen(idx.cint), result.len)\n"
     glue.add "  L.pushNil()\n"
@@ -1147,7 +1147,7 @@ proc registerArrayCheck(ctx: proxyDesc, s: NimNode, id: string, procName: string
   var needCheck = ""
   if not hasName(name):
     setName(name)
-    var glue = "proc $1(L: PState, idx: int): array[$2, $3] =\n" % [name, id, $s]
+    var glue = "proc $1(L: LuaState, idx: int): array[$2, $3] =\n" % [name, id, $s]
     glue.add "  L.checkType(idx.cint, LUA_TTABLE)\n"
     glue.add "  let len = min(L.llen(idx.cint), result.len)\n"
     glue.add "  L.pushNil()\n"
@@ -1204,7 +1204,7 @@ proc registerSetCheck(ctx: proxyDesc, s: NimNode, procName: string): string {.co
   var needCheck = ""
   if not hasName(name):
     setName(name)
-    var glue = "proc $1(L: PState, idx: int): set[$2] =\n" % [name, $s]
+    var glue = "proc $1(L: LuaState, idx: int): set[$2] =\n" % [name, $s]
     glue.add "  L.checkType(idx.cint, LUA_TTABLE)\n"
     glue.add "  let len = L.llen(idx.cint)\n"
     glue.add "  L.pushNil()\n"
@@ -1238,7 +1238,7 @@ proc registerSequenceCheck(ctx: proxyDesc, s: NimNode, procName: string): string
   var needCheck = ""
   if not hasName(name):
     setName(name)
-    var glue = "proc $1(L: PState, idx: int): seq[$2] =\n" % [name, $s]
+    var glue = "proc $1(L: LuaState, idx: int): seq[$2] =\n" % [name, $s]
     glue.add "  L.checkType(idx.cint, LUA_TTABLE)\n"
     glue.add "  let len = L.llen(idx.cint)\n"
     glue.add "  L.pushNil()\n"
@@ -1280,7 +1280,7 @@ proc registerTupleCheck(ctx: proxyDesc, nType: NimNode, procName: string): strin
 
   if not hasName(name):
     setName(name)
-    var glue = "proc $1(L: PState, idx: int): $2 =\n" % [name, nType.toStrLit.strVal]
+    var glue = "proc $1(L: LuaState, idx: int): $2 =\n" % [name, nType.toStrLit.strVal]
     glue.add "  L.checkType(idx.cint, LUA_TTABLE)\n"
 
     let argList = paramsToArgListBasic(nType, 0)
@@ -1641,7 +1641,7 @@ proc bindSingleFunction(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, proc
 
   var glue = ""
   if bd.bindKind == isClosure: glue.add addClosureEnv(SL, procName, n, bd)
-  glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
+  glue.add "proc " & glueProc & "(L: LuaState): cint {.cdecl.} =\n"
   glue.add genOvCallSingle(ctx, newProcElem(retType, argList), procName, "", {ovfUseRet}, bd)
   result = glue
 
@@ -1792,7 +1792,7 @@ proc bindOverloadedFunction(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueProc,
     ovl.addOvProc(retType, argList)
     inc i
 
-  glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
+  glue.add "proc " & glueProc & "(L: LuaState): cint {.cdecl.} =\n"
   glue.add genOvCall(ctx, ovl, procName, {ovfUseRet}, bd)
   glue.add "  discard luaError(L, \"$1: invalid param count\")\n" % [procName]
   glue.add "  return 0\n"
@@ -1983,7 +1983,7 @@ proc bindSingleConstructor(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, p
 
   var glue = ""
   if bd.bindKind == isClosure: glue.add addClosureEnv(SL, procName, n, bd)
-  glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
+  glue.add "proc " & glueProc & "(L: LuaState): cint {.cdecl.} =\n"
   if isRefType(subject):
     glue.add "  var proxy: NL_$1Proxy\n" % [subjectName]
     glue.add genOvCallSingle(ctx, newProcElem(retType, argList), procName, "", {ovfConstructor}, bd)
@@ -2029,7 +2029,7 @@ proc isDescendant(a, b: NimNode): bool {.compileTime.} =
 proc eqTypeOrDescendant(a, b: NimNode): bool {.compileTime.} =
   result = eqType(a, b) or isDescendant(a, b)
 
-proc getRegisteredUD*[T](L: PState, proxy: T): ptr T =
+proc getRegisteredUD*[T](L: LuaState, proxy: T): ptr T =
   # get ref type userdata from REGISTRYINDEX
   # if it's already there or create one if it's not there
   # this help us to communicate with lua side from Nim
@@ -2081,7 +2081,7 @@ proc bindOverloadedConstructor(ctx: proxyDesc, bd: bindDesc, ov: NimNode, gluePr
     ovl.addOvProc(retType, argList)
     inc i
 
-  glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
+  glue.add "proc " & glueProc & "(L: LuaState): cint {.cdecl.} =\n"
   if isRefType(subject):
     glue.add "  var proxy: NL_$1Proxy\n" % [subjectName]
     glue.add genOvCall(ctx, ovl, procName, {ovfConstructor}, bd)
@@ -2121,7 +2121,7 @@ proc bindObjectSingleMethod(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, 
 
   var glue = ""
   if bd.bindKind == isClosure: glue.add addClosureEnv(SL, procName, n, bd)
-  glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
+  glue.add "proc " & glueProc & "(L: LuaState): cint {.cdecl.} =\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1")
   glue.add "  if proxy.isNil: return 0\n"
   glue.add genOvCallSingle(ctx, newProcElem(retType, argList), procName, "", {ovfUseObject, ovfUseRet}, bd)
@@ -2160,7 +2160,7 @@ proc bindObjectOverloadedMethod(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueP
     glue.add bindOverloadedConstructor(ctx, bd, ovc, glueProc, procName, subjectName)
     return glue
 
-  glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
+  glue.add "proc " & glueProc & "(L: LuaState): cint {.cdecl.} =\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1")
   glue.add "  if proxy.isNil: return 0\n"
   glue.add genOvCall(ctx, ovl, procName, {ovfUseObject, ovfUseRet}, bd)
@@ -2175,7 +2175,7 @@ proc bindGetter(ctx: proxyDesc, glueProc, propName, subjectName: string, propTyp
     procCall = "proxy.ud." & propName
     procName = $subject & "." & propName
 
-  glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
+  glue.add "proc " & glueProc & "(L: LuaState): cint {.cdecl.} =\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1")
   glue.add "  if proxy.isNil: return 0\n"
   glue.add constructRet(propType, procCall, "  ", procName)
@@ -2190,7 +2190,7 @@ proc bindSetter(ctx: proxyDesc, glueProc, propName, subjectName: string, propTyp
     procCall = "proxy.ud." & propName
     procName = $subject & "." & propName
 
-  glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
+  glue.add "proc " & glueProc & "(L: LuaState): cint {.cdecl.} =\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1")
   glue.add "  if proxy.isNil: return 0\n"
   glue.add "  $1 = $2" % [procCall, constructArg(ctx, propType, 2, procName, needCheck)]
@@ -2277,7 +2277,7 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
       inc proxyCount
 
   if isRefType(subject) and not hasName("dtor" & $subject):
-    glue.add "proc $1_destructor(L: PState): cint {.cdecl.} =\n" % [subjectName]
+    glue.add "proc $1_destructor(L: LuaState): cint {.cdecl.} =\n" % [subjectName]
     glue.add "  var proxy = " & checkUD(subjectName, "1")
     glue.add "  if proxy.isNil: return 0\n"
     glue.add "  GC_unref(proxy.ud)\n"
@@ -2333,5 +2333,41 @@ macro instantiateRegisteredProxy(obj: typed): untyped =
   glue.add "result = proxy.ud\n"
   result = parseCode(glue)
 
-proc getUD*[T: ref](L: PState, objRef: T): T =
+proc getUD*[T: ref](L: LuaState, objRef: T): T =
   instantiateRegisteredProxy(T)
+
+proc pushAny*[T](L: LuaState, val: T) =
+  when T is SomeInteger:
+    L.pushinteger(val.lua_Integer)
+  elif T is SomeFloat:
+    L.pushnumber(val.lua_Number)
+  elif T is array or T is seq:
+    L.newtable()
+    for i in 0..<val.len:
+      L.pushAny(val[i])
+      L.rawseti(-2, i+1)
+  elif T is string or T is cstring:
+    discard L.pushstring(val.cstring)
+  elif T is ref or T is object:
+    #TODO push object
+    discard
+  elif T is bool:
+    L.pushboolean(val.int32)
+  elif T is pointer or T is ptr:
+    L.pushlightuserdata(val)
+  else:
+    {.error "Not supported type".}
+
+macro callfunctionImpl(L: static[string], args: varargs[untyped]): untyped =
+  let l = newIdentNode(L)
+  result = newStmtList()
+  for i in 0..<args.len:
+    result.add newCall(newIdentNode("pushAny"), l, args[i])
+  result.add newCall(newIdentNode("call"), l, newLit(args.len), newLit(-1))
+  #echo result.repr
+
+template callfunction*(L: LuaState, fn: string, args: varargs[untyped]): untyped =
+  L.getglobal(fn)
+  let top1 = L.gettop()
+  if L.luatype(top1) == LUA_TFUNCTION:
+    callfunctionImpl("L", args)
