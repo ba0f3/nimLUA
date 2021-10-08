@@ -1,5 +1,10 @@
 import nimLUA, unittest
 
+proc print_pointer(p: pointer) =
+  let pArr = cast[ptr UncheckedArray[int]](p)
+  echo pArr[0]
+  echo pArr[1]
+
 suite "Test call Lua fucntion from Nim":
   var
     L: LuaState
@@ -12,6 +17,10 @@ function add(a, b)
   return a + b, -1
 end
 
+function hello()
+  print("Hello world")
+end
+
 function greating(name)
   return "Hello " .. name
 end
@@ -21,9 +30,18 @@ function arrsize(arr)
   return #arr
 end
 
+function pointer(p)
+  print_pointer(p)
+end
+
 """)
   teardown:
     L.close()
+
+  test "no param":
+    L.callfunction("hello")
+    retCount = L.gettop()
+    assert retCount == 0
 
   test "input integer":
     L.callfunction("add", 3, 5)
@@ -52,4 +70,11 @@ end
     retCount = L.gettop()
     assert retCount == 1
     assert L.tointeger(1) == arr.len
+    L.pop(retCount)
+
+  test "input pointer":
+    var arr = [1,2,3,4,5,6]
+    L.bindFunction(print_pointer)
+    L.callfunction("pointer", addr arr)
+    retCount = L.gettop()
     L.pop(retCount)

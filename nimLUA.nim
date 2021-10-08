@@ -92,9 +92,9 @@ type
     nloAddMember
 
   NLError* = object
-    source: string
-    currentLine: int
-    msg: string
+    source*: string
+    currentLine*: int
+    msg*: string
 
   NLErrorFunc* = proc(ctx: pointer, err: NLError) {.nimcall.}
 
@@ -2356,9 +2356,9 @@ proc pushAny*[T](L: LuaState, val: T) =
   elif T is pointer or T is ptr:
     L.pushlightuserdata(val)
   else:
-    {.error "Not supported type".}
+    {.error: "Not supported type:" & $type(T).}
 
-macro callfunctionImpl(L: static[string], args: varargs[untyped]): untyped =
+macro callfunctionImpl*(L: static[string], args: varargs[untyped]): untyped =
   let l = newIdentNode(L)
   result = newStmtList()
   for i in 0..<args.len:
